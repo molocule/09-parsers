@@ -171,7 +171,11 @@ char of a (nonempty) string and interprets it as an int in the range
 -}
 
 oneDigit :: Parser Int
-oneDigit = undefined
+oneDigit = P $ \s -> case s of
+  (i : is) -> do
+    read <- readMaybe [i] :: Maybe Int
+    return (read, is)
+  [] -> Nothing
 
 {-
 ~~~~~{.haskell}
@@ -202,7 +206,9 @@ if the first character satisfies the predicate.
 -}
 
 satisfy :: (Char -> Bool) -> Parser Char
-satisfy f = undefined
+satisfy f = P $ \s -> case s of
+  (c : cs) -> if f c then Just (c, cs) else Nothing
+  [] -> Nothing
 
 {-
 ~~~~~{.haskell}
@@ -288,7 +294,9 @@ Of course! Like lists, the type constructor `Parser` is a functor.
 
 instance Functor Parser where
   fmap :: (a -> b) -> Parser a -> Parser b
-  fmap = undefined
+  fmap f p = P $ \s -> do
+    (c, cs) <- doParse p s
+    return (f c, cs)
 
 {-
 With `get`, `satisfy`, `filter`, and `fmap`, we now have a small library
@@ -332,7 +340,7 @@ Finally, finish this parser that should parse just one specific `Char`:
 -}
 
 char :: Char -> Parser Char
-char c = undefined
+char c = satisfy' (== c)
 
 {-
 ~~~~~~~~~~~{.haskell}
@@ -370,7 +378,10 @@ other and returns the pair of resulting values...
 -}
 
 pairP0 :: Parser a -> Parser b -> Parser (a, b)
-pairP0 = undefined
+pairP0 (P p1) (P p2) = P $ \s -> do
+  (c1, cs) <- p1 s
+  (c2, cs') <- p2 cs
+  return ((c1, c2), cs')
 
 {-
 and use that to rewrite `twoChar` more elegantly like this:
@@ -545,7 +556,10 @@ see if you can figure out an appropriate definition of `(>>=)`.
 -}
 
 bindP :: Parser a -> (a -> Parser b) -> Parser b
-bindP = undefined
+bindP p f = P $ \s -> do
+  (a, as) <- doParse p s
+  (b, bs) <- doParse (f a) as
+  return (b, bs)
 
 {-
 Recursive Parsing
